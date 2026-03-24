@@ -64,26 +64,43 @@ const PricingAndDiscounts = () => {
  );
 
  return (
-  <div className="space-y-6 animate-in fade-in duration-500 font-sans RTL">
+  <div className="space-y-6 animate-in fade-in duration-500" dir="rtl">
 
-  {/* Header */}
-  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
-   <div>
-   <h1 className="text-3xl sm:text-4xl font-black text-slate-800">إدارة الخصومات</h1>
-   <p className="text-slate-500 mt-1 font-medium text-sm">إنشاء وإدارة أكواد الخصم والكوبونات</p>
-   </div>
-   <button onClick={() => { setEditingDiscount(null); setShowModal(true); }}
-   className="bg-primary hover:bg-primary/90 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-primary/20 flex items-center gap-2">
-   <Plus size={18} /> إضافة كود خصم
-   </button>
-  </div>
+    {/* ── Hero Strip ── */}
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-rose-500 to-orange-600 px-8 py-8 shadow-xl shadow-rose-200/40">
+      <div className="absolute -top-8 -left-8 w-40 h-40 bg-white/10 rounded-full" />
+      <div className="absolute bottom-0 right-1/4 w-32 h-32 bg-yellow-400/20 rounded-full translate-y-1/2" />
+      <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <span className="text-rose-100 text-xs font-bold">🏷️ أكواد الخصم</span>
+          <h1 className="text-3xl font-black text-white mt-1">إدارة الخصومات</h1>
+          <p className="text-rose-100/80 mt-1 text-sm">إنشاء وإدارة أكواد الخصم والكوبونات</p>
+        </div>
+        <button onClick={() => { setEditingDiscount(null); setShowModal(true); }}
+          className="flex items-center gap-2 bg-white text-rose-600 px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-rose-50 transition-all shadow-lg flex-shrink-0">
+          <Plus size={18} /> إضافة كود خصم
+        </button>
+      </div>
+    </div>
 
-  {/* KPI */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-   <StatCard title="الكوبونات النشطة" value={stats.active} icon={Percent} color="bg-emerald-100 text-emerald-600" />
-   <StatCard title="مرات الاستخدام" value={stats.totalUsed} icon={Users} color="bg-blue-100 text-blue-600" />
-   <StatCard title="إجمالي الخصومات" value={`${stats.totalAmount.toLocaleString('en-US')}`} sub="د.ع" icon={Tag} color="bg-amber-100 text-amber-600" />
-  </div>
+    {/* ── KPI Cards ── */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {[
+        { title: 'الكوبونات النشطة',   value: stats.active,                                            from: 'from-emerald-500', to: 'to-teal-600',   light: 'bg-emerald-50', text: 'text-emerald-600', icon: Percent },
+        { title: 'مرات الاستخدام',     value: stats.totalUsed,                                         from: 'from-blue-500',    to: 'to-indigo-600', light: 'bg-blue-50',    text: 'text-blue-600',    icon: Users   },
+        { title: 'إجمالي الخصومات د.ع', value: stats.totalAmount.toLocaleString('en-US'),               from: 'from-amber-500',   to: 'to-orange-500', light: 'bg-amber-50',   text: 'text-amber-600',   icon: Tag     },
+      ].map((k, i) => (
+        <div key={i} className="relative bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden p-5">
+          <div className={`absolute top-0 right-0 left-0 h-1 bg-gradient-to-l ${k.from} ${k.to}`} />
+          <div className={`w-10 h-10 rounded-2xl ${k.light} flex items-center justify-center mb-3`}>
+            <k.icon size={18} className={k.text} />
+          </div>
+          <p className="text-[11px] font-bold text-slate-400">{k.title}</p>
+          <p className="text-2xl font-black text-slate-800 mt-0.5">{loading ? '...' : k.value}</p>
+        </div>
+      ))}
+    </div>
+
 
   {/* Table */}
   <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">

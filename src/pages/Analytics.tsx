@@ -379,47 +379,41 @@ const Analytics = () => {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 font-sans RTL" dir="rtl">
+    <div className="space-y-6 animate-in fade-in duration-500" dir="rtl">
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-4xl font-black text-slate-800 dark:text-slate-100">التحليلات المالية</h1>
-          <p className="text-slate-500 mt-1 font-medium text-sm">تتبع الإيرادات والخصومات وأداء الطلبات بذكاء</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={fetchData} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 px-4 py-2 rounded-xl font-bold text-sm transition-all">
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> تحديث
-          </button>
-          <button
-            onClick={exportExcel}
-            disabled={!!exporting}
-            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm disabled:opacity-60"
-          >
-            <FileSpreadsheet size={15} /> {exporting === 'excel' ? 'جاري التصدير...' : 'Excel'}
-          </button>
-          <button
-            onClick={exportWord}
-            disabled={!!exporting}
-            className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm disabled:opacity-60"
-          >
-            <FileDown size={15} /> {exporting === 'word' ? 'جاري التصدير...' : 'Word'}
-          </button>
+      {/* ── Hero Strip ── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-indigo-600 to-blue-700 px-8 py-8 shadow-xl shadow-indigo-200/40">
+        <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full" />
+        <div className="absolute bottom-0 left-1/4 w-32 h-32 bg-emerald-400/20 rounded-full translate-y-1/2" />
+        <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <span className="text-indigo-200 text-xs font-bold">📊 لوحة الأرقام</span>
+            <h1 className="text-3xl font-black text-white mt-1">التحليلات المالية</h1>
+            <p className="text-indigo-100/80 mt-1 text-sm">تتبع الإيرادات والخصومات وأداء الطلبات بذكاء</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={fetchData} className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 px-4 py-2 rounded-2xl font-bold text-sm transition-all">
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> تحديث
+            </button>
+            <button onClick={exportExcel} disabled={!!exporting}
+              className="flex items-center gap-1.5 bg-emerald-500/80 hover:bg-emerald-500 text-white px-4 py-2 rounded-2xl font-bold text-sm transition-all shadow-sm disabled:opacity-60">
+              <FileSpreadsheet size={14} /> {exporting === 'excel' ? 'جاري...' : 'Excel'}
+            </button>
+            <button onClick={exportWord} disabled={!!exporting}
+              className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 px-4 py-2 rounded-2xl font-bold text-sm transition-all disabled:opacity-60">
+              <FileDown size={14} /> {exporting === 'word' ? 'جاري...' : 'Word'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Date Range Filter */}
       <div className="flex bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-1 rounded-2xl w-full max-w-md shadow-sm">
         {dateRanges.map(r => (
-          <button
-            key={r.id}
-            onClick={() => setDateRange(r.id)}
+          <button key={r.id} onClick={() => setDateRange(r.id)}
             className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-              dateRange === r.id
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
+              dateRange === r.id ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}>
             {r.label}
           </button>
         ))}

@@ -39,6 +39,7 @@ const DashboardLayout = () => {
         { label: 'المتجر', icon: LucideIcons.Package, path: '/store', from: '#2dd4bf', to: '#14b8a6' },
         { label: 'التسعير', icon: LucideIcons.Tags, path: '/pricing', from: '#e879f9', to: '#d946ef' },
         { label: 'التسعير الذكي', icon: LucideIcons.TrendingUp, path: '/dynamic-pricing', from: '#72e3ad', to: '#06b6d4' },
+        { label: 'الاشتراكات', icon: LucideIcons.CreditCard, path: '/subscriptions', from: '#8b5cf6', to: '#6d28d9' },
         { label: 'التحليلات المالية', icon: LucideIcons.BarChart3, path: '/analytics', from: '#f59e0b', to: '#ef4444' },
     ];
 

@@ -125,16 +125,22 @@ const Notifications = () => {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 font-sans RTL">
+        <div className="space-y-6 animate-in fade-in duration-500" dir="rtl">
 
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl sm:text-4xl font-black text-slate-800 flex items-center gap-3">
-                    الإشعارات <Bell className="text-primary" size={32} />
-                </h1>
-                <p className="text-slate-500 mt-1 font-medium text-sm">
-                    إرسال إشعارات مخصصة لمستخدمي التطبيق وتنبيههم بآخر التحديثات
-                </p>
+            {/* ── Hero Strip ── */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-teal-500 to-emerald-600 px-8 py-8 shadow-xl shadow-emerald-200/40">
+                <div className="absolute -top-8 -left-8 w-40 h-40 bg-white/10 rounded-full" />
+                <div className="absolute bottom-0 right-1/3 w-28 h-28 bg-blue-400/20 rounded-full translate-y-1/2" />
+                <div className="relative flex items-center gap-4">
+                    <div className="bg-white/20 backdrop-blur-sm border border-white/30 p-4 rounded-2xl">
+                        <Bell className="text-white" size={28} />
+                    </div>
+                    <div>
+                        <span className="text-emerald-100 text-xs font-bold">🔔 إدارة الإشعارات</span>
+                        <h1 className="text-3xl font-black text-white mt-0.5">إرسال الإشعارات</h1>
+                        <p className="text-emerald-100/80 mt-1 text-sm">إرسال إشعارات فورية لمستخدمي التطبيق</p>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

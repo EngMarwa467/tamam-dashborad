@@ -223,11 +223,17 @@ export default function ZonePricing() {
   return (
     <div className="space-y-6 animate-in fade-in duration-400" dir="rtl">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-black text-slate-800">التسعير الديناميكي</h1>
-        <p className="text-slate-500 mt-1 text-sm">إدارة مناطق التسعير والأسعار ورسوم الخيارات الإضافية</p>
+      {/* ── Hero Strip ── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-cyan-500 to-blue-600 px-8 py-8 shadow-xl shadow-cyan-200/40">
+        <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full" />
+        <div className="absolute bottom-0 left-1/3 w-28 h-28 bg-teal-300/20 rounded-full translate-y-1/2" />
+        <div className="relative">
+          <span className="text-cyan-100 text-xs font-bold">🗺️ التسعير الجغرافي</span>
+          <h1 className="text-3xl font-black text-white mt-1">التسعير بالمناطق</h1>
+          <p className="text-cyan-100/80 mt-1 text-sm">إدارة مناطق التسعير والأسعار ورسوم الخيارات الإضافية</p>
+        </div>
       </div>
+
 
       {/* How it works */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex gap-3 text-sm text-blue-800">

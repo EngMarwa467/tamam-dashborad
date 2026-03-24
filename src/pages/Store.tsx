@@ -91,57 +91,42 @@ export default function Store() {
  );
 
  return (
- <div className="space-y-6 dir-rtl">
- {/* Header */}
- <div className="flex justify-between items-center mb-8">
- <div>
- <h1 className="text-3xl font-bold text-slate-800 ">المتجر والمخزون</h1>
- <p className="text-slate-500 mt-1 font-medium">إدارة قطع الغيار، تسعيرها، ومراقبة المبيعات.</p>
- </div>
- <button 
- onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
- className="bg-primary hover:bg-primary/90 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-primary/20 flex items-center gap-2"
- >
- <Plus size={20} />
- <span>إضافة منتج جديد</span>
- </button>
- </div>
+  <div className="space-y-6 animate-in fade-in duration-500" dir="rtl">
 
- {/* Analytics Cards */}
- <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
- <div className="bg-white rounded-3xl p-6 shadow-sm flex flex-col justify-between h-40 border border-slate-200 hover:shadow-md hover:-translate-y-1 transition-all">
- <div className="flex items-center gap-4">
- <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border flex items-center justify-center">
- <Package size={24} className="text-primary " />
- </div>
- <p className="text-base font-bold text-slate-600 ">إجمالي المنتجات</p>
- </div>
- <p className="text-4xl font-black text-slate-800 mt-4">{stats.totalProducts}</p>
- </div>
+    {/* ── Hero Strip ── */}
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-sky-500 to-blue-700 px-8 py-8 shadow-xl shadow-sky-200/40">
+      <div className="absolute -top-8 -left-8 w-40 h-40 bg-white/10 rounded-full" />
+      <div className="absolute bottom-0 right-1/3 w-28 h-28 bg-cyan-300/20 rounded-full translate-y-1/2" />
+      <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <span className="text-sky-100 text-xs font-bold">📦 قطع الغيار</span>
+          <h1 className="text-3xl font-black text-white mt-1">المتجر والمخزون</h1>
+          <p className="text-sky-100/80 mt-1 text-sm">إدارة قطع الغيار، تسعيرها، ومراقبة المبيعات</p>
+        </div>
+        <button onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
+          className="flex items-center gap-2 bg-white text-sky-600 px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-sky-50 transition-all shadow-lg flex-shrink-0">
+          <Plus size={18} /> إضافة منتج جديد
+        </button>
+      </div>
+    </div>
 
- <div className="bg-white rounded-3xl p-6 shadow-sm flex flex-col justify-between h-40 border border-slate-200 hover:shadow-md hover:-translate-y-1 transition-all">
- <div className="flex items-center gap-4 relative">
- <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center animate-pulse">
- <AlertTriangle size={24} className="text-amber-500 text-amber-600 " />
- </div>
- <p className="text-base font-bold text-slate-600 ">قاربت على النفاذ</p>
- </div>
- <div className="flex items-baseline gap-2 mt-4">
- <p className="text-4xl font-black text-slate-800 ">{stats.lowStock}</p>
- <span className="text-sm font-medium text-slate-500">منتجات</span>
- </div>
- </div>
-
- <div className="bg-white rounded-3xl p-6 shadow-sm flex flex-col justify-between h-40 border border-slate-200 hover:shadow-md hover:-translate-y-1 transition-all">
- <div className="flex items-center gap-4">
- <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
- <DollarSign size={24} className="text-emerald-600 " />
- </div>
- <p className="text-base font-bold text-slate-600 ">المبيعات الإجمالية</p>
- </div>
- <p className="text-3xl font-black text-slate-800 mt-4">{stats.totalSalesValue.toLocaleString('en-US')} <span className="text-xl">د.ع</span></p>
- </div>
- </div>
+    {/* ── KPI Cards ── */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {[
+        { title: 'إجمالي المنتجات', value: stats.totalProducts,                                         from: 'from-blue-500',    to: 'to-indigo-600',  light: 'bg-blue-50',    text: 'text-blue-600',    icon: Package        },
+        { title: 'قاربت على النفاذ',  value: stats.lowStock,                                             from: 'from-amber-500',   to: 'to-orange-500',  light: 'bg-amber-50',   text: 'text-amber-600',   icon: AlertTriangle  },
+        { title: 'المبيعات الإجمالية', value: `${stats.totalSalesValue.toLocaleString('en-US')} د.ع`,   from: 'from-emerald-500', to: 'to-teal-600',    light: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign     },
+      ].map((k, i) => (
+        <div key={i} className="relative bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden p-6">
+          <div className={`absolute top-0 right-0 left-0 h-1 bg-gradient-to-l ${k.from} ${k.to}`} />
+          <div className={`w-12 h-12 rounded-2xl ${k.light} flex items-center justify-center mb-4`}>
+            <k.icon size={22} className={k.text} />
+          </div>
+          <p className="text-xs font-bold text-slate-400">{k.title}</p>
+          <p className="text-3xl font-black text-slate-800 mt-1">{loading ? '...' : k.value}</p>
+        </div>
+      ))}
+    </div>
 
  {/* Main Content */}
  <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col relative z-20 mb-4">

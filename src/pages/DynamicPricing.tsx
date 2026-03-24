@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { DollarSign, Plus, Trash2, Edit3, Check, X, Clock, Zap, Tag, AlertCircle } from 'lucide-react';
+import { DollarSign, Plus, Trash2, Edit3, Check, X, Clock, Zap, Tag, AlertCircle, Star, MapPin, Users } from 'lucide-react';
 import { IRAQ_GOVERNORATES } from '../data/iraqLocations';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -9,8 +9,23 @@ interface PricingCfg  { id: string; service_id: string; city: string; district: 
 interface SurgeRule   { id: string; city: string | null; label: string; day_of_week: number[] | null; hour_from: number; hour_to: number; multiplier: number; is_active: boolean; }
 interface DemandCfg   { id: string; city: string; surge_threshold_ratio: number; max_surge_multiplier: number; is_active: boolean; }
 interface Extra       { id: string; service_id: string; option_key: string; option_value: string | null; extra_fee: number; label_ar: string; }
+interface Tier        { id: string; name_ar: string; min_rating: number; max_rating: number; worker_cut_pct: number; badge_color: string; is_active: boolean; }
+interface PZone       { id: string; name_ar: string; city: string; }
+interface TierOverride{ id: string; tier_id: string; zone_id: string; worker_cut_pct: number; }
+interface Worker      { id: string; full_name: string; phone: string; rating: number; rating_count: number; }
 
-type Tab = 'pricing' | 'peak' | 'demand' | 'extras';
+type Tab = 'pricing' | 'peak' | 'demand' | 'extras' | 'tiers' | 'tierZones' | 'tierWorkers';
+
+const BADGE_COLORS = [
+  { value: 'gold',   label: '🥇 ذهبي',  bg: 'bg-amber-100',  text: 'text-amber-800',  border: 'border-amber-300' },
+  { value: 'silver', label: '🥈 فضي',   bg: 'bg-slate-100',  text: 'text-slate-700',  border: 'border-slate-300' },
+  { value: 'bronze', label: '🥉 برونزي', bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
+  { value: 'blue',   label: '💎 أزرق',   bg: 'bg-blue-100',   text: 'text-blue-800',   border: 'border-blue-300' },
+  { value: 'green',  label: '🌿 أخضر',   bg: 'bg-emerald-100',text: 'text-emerald-800',border: 'border-emerald-300' },
+  { value: 'gray',   label: '⚪ رمادي',  bg: 'bg-slate-100',  text: 'text-slate-500',  border: 'border-slate-200' },
+];
+const getBadge = (c: string) => BADGE_COLORS.find(b => b.value === c) ?? BADGE_COLORS[5];
+const getTierForRating = (r: number, ts: Tier[]) => ts.filter(t => t.is_active && r >= t.min_rating && r <= t.max_rating).sort((a,b) => b.min_rating - a.min_rating)[0] ?? null;
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const IRAQ_CITIES = ['بغداد', 'البصرة', 'أربيل', 'نينوى', 'النجف', 'كربلاء', 'كركوك', 'الأنبار', 'ديالى', 'بابل', 'ذي قار', 'ميسان', 'المثنى', 'القادسية', 'واسط', 'صلاح الدين', 'السليمانية', 'دهوك'];
@@ -96,6 +111,10 @@ export default function DynamicPricing() {
   const [surges,     setSurges]     = useState<SurgeRule[]>([]);
   const [demands,    setDemands]    = useState<DemandCfg[]>([]);
   const [extras,     setExtras]     = useState<Extra[]>([]);
+  const [tiers,      setTiers]      = useState<Tier[]>([]);
+  const [pZones,     setPZones]     = useState<PZone[]>([]);
+  const [tierOvr,    setTierOvr]    = useState<TierOverride[]>([]);
+  const [workers,    setWorkers]    = useState<Worker[]>([]);
   const [dbReady,    setDbReady]    = useState(true);
   const [loading,    setLoading]    = useState(true);
   const [editId,     setEditId]     = useState<string | null>(null);
@@ -106,22 +125,52 @@ export default function DynamicPricing() {
   const [showSForm, setShowSForm] = useState(false);
   const [showDForm, setShowDForm] = useState(false);
   const [showEForm, setShowEForm] = useState(false);
+  const [showTForm, setShowTForm] = useState(false);
+  const [showOForm, setShowOForm] = useState(false);
   const [newP, setNewP] = useState({ service_id: '', city: '', district: '', base_price: '', price_per_km: '500', worker_cut_pct: '72', urgent_fee: '10000', center_lat: '', center_lng: '' });
   const [newS, setNewS] = useState({ city: '', label: '', day_of_week: [] as number[], hour_from: '18', hour_to: '23', multiplier: '1.3' });
   const [newD, setNewD] = useState({ city: '', surge_threshold_ratio: '0.3', max_surge_multiplier: '2.0' });
   const [newE, setNewE] = useState({ service_id: '', option_key: '', option_value: '', extra_fee: '', label_ar: '' });
+  const [newT, setNewT] = useState({ name_ar: '', min_rating: '', max_rating: '', worker_cut_pct: '', badge_color: 'gold' });
+  const [newO, setNewO] = useState({ tier_id: '', zone_id: '', worker_cut_pct: '' });
 
   const fetchAll = async () => {
     setLoading(true);
-    const [{ data: s }, { data: c, error: ce }, { data: sr }, { data: dc }, { data: ex }] = await Promise.all([
+    const [{ data: s }, { data: c, error: ce }, { data: sr }, { data: dc }, { data: ex }, { data: ti }, { data: pz }, { data: to2 }, { data: wo }, { data: ratingsData }] = await Promise.all([
       supabase.from('services').select('id,name_ar,base_price').eq('is_active', true),
       supabase.from('pricing_config').select('*').order('city'),
       supabase.from('pricing_surge_rules').select('*').order('hour_from'),
       supabase.from('pricing_demand_config').select('*').order('city'),
       supabase.from('pricing_extras').select('*').order('service_id'),
+      supabase.from('worker_tiers').select('*').order('min_rating', { ascending: false }),
+      supabase.from('pricing_zones').select('id, name_ar, city').order('name_ar'),
+      supabase.from('worker_tier_zone_overrides').select('*'),
+      supabase.from('profiles').select('id, user_id, full_name, phone').eq('role', 'worker').order('created_at', { ascending: false }),
+      supabase.from('maintenance_requests').select('worker_id, rating').not('rating', 'is', null),
     ]);
     if (ce) setDbReady(false);
+
+    // Compute rating per worker (keyed by user_id)
+    const ratingsMap: Record<string, { sum: number; count: number }> = {};
+    (ratingsData || []).forEach((r: any) => {
+      if (!r.worker_id) return;
+      if (!ratingsMap[r.worker_id]) ratingsMap[r.worker_id] = { sum: 0, count: 0 };
+      ratingsMap[r.worker_id].sum += r.rating;
+      ratingsMap[r.worker_id].count += 1;
+    });
+
+    const enrichedWorkers = (wo || []).map((w: any) => {
+      const uid = w.user_id;
+      const rm = ratingsMap[uid];
+      return {
+        ...w,
+        rating: rm ? rm.sum / rm.count : 0,
+        rating_count: rm?.count || 0,
+      };
+    }).sort((a: any, b: any) => b.rating - a.rating);
+
     setServices(s || []); setConfigs(c || []); setSurges(sr || []); setDemands(dc || []); setExtras(ex || []);
+    setTiers(ti || []); setPZones(pz || []); setTierOvr(to2 || []); setWorkers(enrichedWorkers);
     setLoading(false);
   };
   useEffect(() => { fetchAll(); }, []);
@@ -186,20 +235,53 @@ export default function DynamicPricing() {
   };
   const delExtra = async (id: string) => { await supabase.from('pricing_extras').delete().eq('id', id); fetchAll(); };
 
+  // ── Tier CRUD ─────────────────────────────────────────────────────────────────
+  const addTier = async () => {
+    const { name_ar, min_rating, max_rating, worker_cut_pct, badge_color } = newT;
+    if (!name_ar || !min_rating || !max_rating || !worker_cut_pct) return;
+    const { error } = await supabase.from('worker_tiers').insert({ name_ar, min_rating: +min_rating, max_rating: +max_rating, worker_cut_pct: +worker_cut_pct, badge_color });
+    if (error) { alert('❌ ' + error.message); return; }
+    setNewT({ name_ar: '', min_rating: '', max_rating: '', worker_cut_pct: '', badge_color: 'gold' }); setShowTForm(false); fetchAll();
+  };
+  const saveTier = async (id: string) => {
+    await supabase.from('worker_tiers').update({ name_ar: editBuf.name_ar, min_rating: +editBuf.min_rating, max_rating: +editBuf.max_rating, worker_cut_pct: +editBuf.worker_cut_pct, badge_color: editBuf.badge_color }).eq('id', id);
+    setEditId(null); fetchAll();
+  };
+  const toggleTier = async (t: Tier) => { await supabase.from('worker_tiers').update({ is_active: !t.is_active }).eq('id', t.id); fetchAll(); };
+  const deleteTier = async (id: string) => { if (confirm('حذف الفئة؟')) { await supabase.from('worker_tiers').delete().eq('id', id); fetchAll(); } };
+  const addTierOverride = async () => {
+    const { tier_id, zone_id, worker_cut_pct } = newO;
+    if (!tier_id || !zone_id || !worker_cut_pct) return;
+    const { error } = await supabase.from('worker_tier_zone_overrides').upsert({ tier_id, zone_id, worker_cut_pct: +worker_cut_pct }, { onConflict: 'tier_id,zone_id' });
+    if (error) { alert('❌ ' + error.message); return; }
+    setNewO({ tier_id: '', zone_id: '', worker_cut_pct: '' }); setShowOForm(false); fetchAll();
+  };
+  const delTierOverride = async (id: string) => { await supabase.from('worker_tier_zone_overrides').delete().eq('id', id); fetchAll(); };
+
   // ── Helpers ───────────────────────────────────────────────────────────────────
   const svcName = (id: string) => services.find(s => s.id === id)?.name_ar ?? '—';
+  const zoneName = (id: string) => pZones.find(z => z.id === id)?.name_ar ?? '—';
+  const tierName = (id: string) => tiers.find(t => t.id === id)?.name_ar ?? '—';
   const tabCls = (t: Tab) => `py-3 px-4 font-bold text-sm border-b-2 whitespace-nowrap transition-colors ${tab === t ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-800'}`;
   const btnCls = 'bg-primary text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 text-sm hover:bg-primary/90 transition';
+  const StarRating = ({ rating }: { rating: number }) => (
+    <span className="flex items-center gap-0.5">{[1,2,3,4,5].map(i => <Star key={i} size={11} className={i <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200'} />)}</span>
+  );
 
   if (loading) return <div className="flex justify-center py-32 text-slate-400">جاري التحميل...</div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-400" dir="rtl">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-black text-slate-800">التسعير الديناميكي</h1>
-        <p className="text-slate-500 text-sm mt-1">نظام تسعير متكامل — سعر أساسي + مسافة + ذروة + طلب</p>
+      {/* ── Hero Strip ── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-violet-600 to-purple-700 px-8 py-8 shadow-xl shadow-violet-200/40">
+        <div className="absolute -top-8 -left-8 w-40 h-40 bg-white/10 rounded-full" />
+        <div className="absolute bottom-0 right-1/4 w-28 h-28 bg-pink-400/20 rounded-full translate-y-1/2" />
+        <div className="relative">
+          <span className="text-violet-200 text-xs font-bold">⚡ محرك التسعير</span>
+          <h1 className="text-3xl font-black text-white mt-1">التسعير الديناميكي وفئات الفنيين</h1>
+          <p className="text-violet-100/80 mt-1 text-sm">نظام تسعير متكامل — أسعار + ذروة + طلب + فئات الفنيين</p>
+        </div>
       </div>
 
       {/* Formula Banner */}
@@ -221,6 +303,10 @@ export default function DynamicPricing() {
         <button className={tabCls('peak')}    onClick={() => setTab('peak')}><Clock size={13} className="inline ml-1" />الذروة ({surges.length})</button>
         <button className={tabCls('demand')}  onClick={() => setTab('demand')}><Zap size={13} className="inline ml-1" />Surge ({demands.length})</button>
         <button className={tabCls('extras')}  onClick={() => setTab('extras')}><Tag size={13} className="inline ml-1" />الإضافات ({extras.length})</button>
+        <div className="w-px bg-slate-300 mx-2 my-2" />
+        <button className={tabCls('tiers')}      onClick={() => setTab('tiers')}><Star size={13} className="inline ml-1" />فئات الفنيين ({tiers.length})</button>
+        <button className={tabCls('tierZones')}  onClick={() => setTab('tierZones')}><MapPin size={13} className="inline ml-1" />تخصيص المنطقة ({tierOvr.length})</button>
+        <button className={tabCls('tierWorkers')} onClick={() => setTab('tierWorkers')}><Users size={13} className="inline ml-1" />الفنيون ({workers.length})</button>
       </div>
 
       {/* ══ TAB 1: PRICING CONFIG ═══════════════════════════════════════ */}
@@ -567,6 +653,185 @@ export default function DynamicPricing() {
                           )}
                         </div>
                       </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ══ TAB 5: WORKER TIERS ═════════════════════════════════════════════ */}
+      {tab === 'tiers' && (
+        <div className="space-y-4">
+          <button onClick={() => setShowTForm(v => !v)} className={btnCls}><Plus size={15} />إضافة فئة</button>
+          {showTForm && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-4">
+              <h3 className="font-bold text-amber-900 text-sm flex items-center gap-2"><Star size={14} />فئة فني جديدة</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">اسم الفئة *</label>
+                  <input className={inputCls} placeholder="نخبة / ممتاز / عادي..." value={newT.name_ar} onChange={e => setNewT(p => ({ ...p, name_ar: e.target.value }))} /></div>
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">أدنى تقييم * (0–5)</label>
+                  <input className={inputCls} type="number" step="0.1" min="0" max="5" placeholder="4.5" value={newT.min_rating} onChange={e => setNewT(p => ({ ...p, min_rating: e.target.value }))} /></div>
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">أعلى تقييم * (0–5)</label>
+                  <input className={inputCls} type="number" step="0.1" min="0" max="5" placeholder="5.0" value={newT.max_rating} onChange={e => setNewT(p => ({ ...p, max_rating: e.target.value }))} /></div>
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">نسبة ربح الفني % *</label>
+                  <input className={inputCls} type="number" min="0" max="100" step="0.5" placeholder="80" value={newT.worker_cut_pct} onChange={e => setNewT(p => ({ ...p, worker_cut_pct: e.target.value }))} /></div>
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">لون الشارة</label>
+                  <select className={inputCls} value={newT.badge_color} onChange={e => setNewT(p => ({ ...p, badge_color: e.target.value }))}>{BADGE_COLORS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}</select></div>
+                {newT.worker_cut_pct && (
+                  <div className="flex items-end"><div className="bg-white border border-amber-200 rounded-xl p-3 w-full text-center">
+                    <p className="text-xs text-slate-500 font-bold">هامش التطبيق</p>
+                    <p className="font-black text-emerald-700 text-lg">{(100 - +newT.worker_cut_pct).toFixed(1)}%</p>
+                  </div></div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={addTier} className="bg-amber-600 text-white rounded-xl px-5 py-2 font-bold text-sm flex items-center gap-2"><Check size={14} />حفظ</button>
+                <button onClick={() => setShowTForm(false)} className="bg-slate-100 text-slate-600 rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-2"><X size={14} />إلغاء</button>
+              </div>
+            </div>
+          )}
+          {tiers.length === 0 && !showTForm && <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl text-sm">لا توجد فئات. أضف فئة أولاً.</div>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {tiers.map(t => {
+              const badge = getBadge(t.badge_color);
+              const isEdit = editId === t.id;
+              return (
+                <div key={t.id} className={`bg-white border-2 rounded-2xl p-5 transition ${t.is_active ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex gap-2">
+                      <button onClick={() => toggleTier(t)} className={`px-3 py-1 rounded-full text-xs font-bold ${t.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{t.is_active ? 'مفعّل' : 'معطّل'}</button>
+                      <button onClick={() => deleteTier(t.id)} className="w-7 h-7 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-100"><Trash2 size={12} /></button>
+                    </div>
+                    <span className={`px-3 py-1.5 rounded-xl text-xs font-black border ${badge.bg} ${badge.text} ${badge.border}`}>{BADGE_COLORS.find(b => b.value === t.badge_color)?.label}</span>
+                  </div>
+                  {isEdit ? (
+                    <div className="space-y-2">
+                      <input className={inputCls} value={editBuf.name_ar} onChange={e => setEditBuf((b: any) => ({ ...b, name_ar: e.target.value }))} />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div><label className="text-[10px] text-slate-400 block">أدنى</label><input className={inputCls} type="number" step="0.1" value={editBuf.min_rating} onChange={e => setEditBuf((b: any) => ({ ...b, min_rating: e.target.value }))} /></div>
+                        <div><label className="text-[10px] text-slate-400 block">أعلى</label><input className={inputCls} type="number" step="0.1" value={editBuf.max_rating} onChange={e => setEditBuf((b: any) => ({ ...b, max_rating: e.target.value }))} /></div>
+                        <div><label className="text-[10px] text-slate-400 block">نسبة %</label><input className={inputCls} type="number" step="0.5" value={editBuf.worker_cut_pct} onChange={e => setEditBuf((b: any) => ({ ...b, worker_cut_pct: e.target.value }))} /></div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => saveTier(t.id)} className="flex-1 bg-emerald-500 text-white rounded-xl py-2 font-bold text-sm flex items-center justify-center gap-1"><Check size={13} />حفظ</button>
+                        <button onClick={() => setEditId(null)} className="flex-1 bg-slate-100 text-slate-600 rounded-xl py-2 font-bold text-sm flex items-center justify-center gap-1"><X size={13} />إلغاء</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-black text-slate-800 text-lg">{t.name_ar}</p>
+                      <div className="flex items-center gap-2 mt-1"><Star size={13} className="text-amber-400 fill-amber-400" /><span className="text-sm text-slate-600 font-bold">{t.min_rating} – {t.max_rating}</span></div>
+                      <div className="mt-4 bg-slate-50 rounded-xl p-3 flex justify-between items-center">
+                        <div className="text-center flex-1"><p className="text-xs text-slate-400 font-bold">ربح الفني</p><p className="text-xl font-black text-purple-700">{t.worker_cut_pct}%</p></div>
+                        <div className="w-px h-8 bg-slate-200" />
+                        <div className="text-center flex-1"><p className="text-xs text-slate-400 font-bold">هامش التطبيق</p><p className="text-xl font-black text-emerald-600">{(100 - t.worker_cut_pct).toFixed(1)}%</p></div>
+                      </div>
+                      <button onClick={() => { setEditId(t.id); setEditBuf({ name_ar: t.name_ar, min_rating: t.min_rating, max_rating: t.max_rating, worker_cut_pct: t.worker_cut_pct, badge_color: t.badge_color }); }}
+                        className="mt-3 w-full bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-xl py-2 font-bold text-sm flex items-center justify-center gap-1 transition border border-slate-200"><Edit3 size={13} />تعديل</button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ TAB 6: TIER ZONE OVERRIDES ═══════════════════════════════════════ */}
+      {tab === 'tierZones' && (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800 text-right">
+            <p className="font-black mb-1">📍 تخصيص المنطقة</p>
+            <p className="text-blue-700 text-xs">إذا أضفت تخصيص لمنطقة معينة، سيُستخدم بدل النسبة الافتراضية للفئة في تلك المنطقة تحديداً.</p>
+          </div>
+          <button onClick={() => setShowOForm(v => !v)} className={btnCls}><Plus size={15} /> إضافة تخصيص</button>
+          {showOForm && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">الفئة *</label>
+                  <select className={inputCls} value={newO.tier_id} onChange={e => setNewO(p => ({ ...p, tier_id: e.target.value }))}>
+                    <option value="">اختر...</option>
+                    {tiers.map(t => <option key={t.id} value={t.id}>{t.name_ar} ({t.worker_cut_pct}% افتراضي)</option>)}
+                  </select></div>
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">المنطقة *</label>
+                  <select className={inputCls} value={newO.zone_id} onChange={e => setNewO(p => ({ ...p, zone_id: e.target.value }))}>
+                    <option value="">اختر...</option>
+                    {pZones.map(z => <option key={z.id} value={z.id}>{z.name_ar}</option>)}
+                  </select></div>
+                <div><label className="text-xs font-bold text-slate-500 mb-1 block">النسبة الخاصة % *</label>
+                  <input className={inputCls} type="number" min="0" max="100" step="0.5" placeholder="82" value={newO.worker_cut_pct} onChange={e => setNewO(p => ({ ...p, worker_cut_pct: e.target.value }))} /></div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={addTierOverride} className="bg-blue-600 text-white rounded-xl px-5 py-2 font-bold text-sm flex items-center gap-2"><Check size={14}/>حفظ</button>
+                <button onClick={() => setShowOForm(false)} className="bg-slate-100 text-slate-600 rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-2"><X size={14}/>إلغاء</button>
+              </div>
+            </div>
+          )}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-600 font-black">
+                <tr><th className="px-4 py-3 text-right">الفئة</th><th className="px-4 py-3 text-right">المنطقة</th><th className="px-4 py-3 text-right">الافتراضي</th><th className="px-4 py-3 text-right text-blue-600">المخصص</th><th className="px-4 py-3 text-right">الفرق</th><th className="px-4 py-3"/></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tierOvr.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-slate-400 text-sm">لا توجد تخصيصات.</td></tr>}
+                {tierOvr.map(o => {
+                  const tier = tiers.find(t => t.id === o.tier_id);
+                  const diff = o.worker_cut_pct - (tier?.worker_cut_pct ?? 0);
+                  const badge = tier ? getBadge(tier.badge_color) : null;
+                  return (
+                    <tr key={o.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">{tier && badge && <span className={`px-2 py-1 rounded-lg text-xs font-black border ${badge.bg} ${badge.text} ${badge.border}`}>{tier.name_ar}</span>}</td>
+                      <td className="px-4 py-3 text-slate-700 font-bold text-xs">{zoneName(o.zone_id)}</td>
+                      <td className="px-4 py-3 text-slate-400 font-bold text-xs">{tier?.worker_cut_pct ?? '—'}%</td>
+                      <td className="px-4 py-3 font-black text-blue-700">{o.worker_cut_pct}%</td>
+                      <td className="px-4 py-3"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${diff > 0 ? 'bg-emerald-100 text-emerald-700' : diff < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>{diff > 0 ? `+${diff.toFixed(1)}%` : diff < 0 ? `${diff.toFixed(1)}%` : 'لا فرق'}</span></td>
+                      <td className="px-4 py-3"><button onClick={() => delTierOverride(o.id)} className="w-7 h-7 bg-red-50 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-100"><Trash2 size={13}/></button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ══ TAB 7: WORKERS PREVIEW ══════════════════════════════════════════ */}
+      {tab === 'tierWorkers' && (
+        <div className="space-y-4">
+          <div className="flex gap-3 flex-wrap">
+            {tiers.filter(t => t.is_active).map(t => {
+              const badge = getBadge(t.badge_color);
+              const count = workers.filter(w => w.rating >= t.min_rating && w.rating <= t.max_rating).length;
+              return (
+                <div key={t.id} className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${badge.bg} ${badge.border}`}>
+                  <span className={`text-sm font-black ${badge.text}`}>{t.name_ar}</span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-white/70 ${badge.text}`}>{count} فني</span>
+                  <span className={`text-xs ${badge.text} opacity-70`}>{t.worker_cut_pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-600 font-black">
+                <tr><th className="px-4 py-3 text-right">الفني</th><th className="px-4 py-3 text-right">هاتف</th><th className="px-4 py-3 text-right">التقييم</th><th className="px-4 py-3 text-right">التقييمات</th><th className="px-4 py-3 text-right">الفئة</th><th className="px-4 py-3 text-right text-purple-600">النسبة</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {workers.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-slate-400 text-sm">لا يوجد فنيون.</td></tr>}
+                {workers.map(w => {
+                  const tier = getTierForRating(w.rating, tiers);
+                  const badge = tier ? getBadge(tier.badge_color) : null;
+                  return (
+                    <tr key={w.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-bold text-slate-800">{w.full_name || <span className="text-slate-400 text-xs italic">بدون اسم</span>}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs font-mono">{w.phone}</td>
+                      <td className="px-4 py-3"><div className="flex items-center gap-2"><span className="font-black text-amber-600">{w.rating?.toFixed(1) ?? '—'}</span>{w.rating > 0 && <StarRating rating={w.rating} />}</div></td>
+                      <td className="px-4 py-3 text-slate-500">{fmt(w.rating_count || 0)}</td>
+                      <td className="px-4 py-3">{tier && badge ? <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${badge.bg} ${badge.text} ${badge.border}`}>{tier.name_ar}</span> : <span className="text-slate-300 text-xs">بدون فئة</span>}</td>
+                      <td className="px-4 py-3">{tier ? <span className="font-black text-purple-700">{tier.worker_cut_pct}%</span> : <span className="text-slate-300">—</span>}</td>
                     </tr>
                   );
                 })}

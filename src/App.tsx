@@ -15,6 +15,7 @@ import Users from './pages/Users';
 import Workers from './pages/Workers';
 import ZonePricing from './pages/ZonePricing';
 import DynamicPricing from './pages/DynamicPricing';
+import SubscriptionPlans from './pages/SubscriptionPlans';
 import AnalyticsHub    from './pages/analytics/index';
 import FinancialKPIs   from './pages/analytics/FinancialKPIs';
 import Charts          from './pages/analytics/Charts';
@@ -68,6 +69,7 @@ function App() {
           <Route path="notifications" element={<Notifications />} />
           <Route path="zone-pricing" element={<ZonePricing />} />
           <Route path="dynamic-pricing" element={<DynamicPricing />} />
+          <Route path="subscriptions" element={<SubscriptionPlans />} />
           <Route path="analytics" element={<AnalyticsHub />} />
           <Route path="analytics/kpis"     element={<FinancialKPIs />} />
           <Route path="analytics/charts"   element={<Charts />} />
